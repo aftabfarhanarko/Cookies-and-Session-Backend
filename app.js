@@ -1,6 +1,6 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
-
+const session = require("express-session");
 const app = express();
 const port = 3000;
 
@@ -9,75 +9,51 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const sessionstore = {};
-// Home Route
-app.get("/", (req, res) => {
-  res.send("Welcome to Cookie Authentication");
-});
+app.use(
+  session({
+    name: "sessionId",
+    secret: "eugfuygffugf87gu",
+    resave: false,
+    saveUninitialized: false,
 
-// Login Route
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  }),
+);
+
+// LOgin
+
 app.post("/login", (req, res) => {
-  const { userName, password } = req.body;
+  const { userName } = req.body;
+  if (!userName) return res.status(404).send("Unvalied User Name");
+  req.session.userName = userName;
+  req.session.loggedIn = true;
 
-  if (!userName || !password) {
-    return res.status(400).json({
-      success: false,
-      message: "Username and password required",
-    });
-  }
-
-  sessionstore[userName] = { loggedIn: true };
-  // Demo authentication only
-
-  res.cookie("user", userName, {
-    maxAge: 15 * 60 * 1000,
-    httpOnly: true,
-    secure: false,
-    sameSite: "strict",
-  });
-
-  return res.status(200).json({
-    success: true,
-    message: "Login Successful",
-  });
+  res.send("Logged in Successfully");
 });
 
-// Check Cookie
-app.get("/check-cookie", (req, res) => {
-  const { user } = req.cookies;
-
-  if (!user) {
-    return res.status(401).send("Cookie Not Found");
+app.get("/protectd", (req, res) => {
+  if (req.session.loggedIn) {
+    res.send("OK  You Are Successfully Logind");
+  } else {
+    res.status(404).send("You are  Unothorize");
   }
-
-  res.send(`Cookie Found: ${user}`);
 });
 
-// Protected Route
-app.get("/protected", (req, res) => {
-  const { user } = req.cookies;
 
-  if (!sessionstore[user]?.loggedIn) {
-    return res.status(401).send("Not Authorized");
-  }
-
-  res.send("Welcome ARKO! You can access this route.");
-});
-
-// Logout Route
 app.post("/logout", (req, res) => {
-  const { user } = req.cookies;
-  if (user) {
-    delete sessionstore[user];
-  }
+  req.session.destroy((error) => {
+    if (error) {
+      return res.status(500).send("Unable to log out");
+    }
 
-  res.clearCookie("user", {
-    httpOnly: true,
-    secure: false,
-    sameSite: "strict",
+    res.clearCookie("sessionId");
+    return res.send("Logout Successfully");
   });
-
-  res.send("Logout Successful");
 });
 
 // Server
