@@ -1,4 +1,3 @@
-
 const express = require("express");
 const cookieParser = require("cookie-parser");
 
@@ -10,6 +9,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const sessionstore = {};
 // Home Route
 app.get("/", (req, res) => {
   res.send("Welcome to Cookie Authentication");
@@ -22,29 +22,23 @@ app.post("/login", (req, res) => {
   if (!userName || !password) {
     return res.status(400).json({
       success: false,
-      message: "Username and password required"
+      message: "Username and password required",
     });
   }
 
+  sessionstore[userName] = { loggedIn: true };
   // Demo authentication only
-  if (userName === "ARKO" && password === "123456") {
 
-    res.cookie("user", userName, {
-      maxAge: 15 * 60 * 1000,
-      httpOnly: true,
-      secure: false,
-      sameSite: "strict"
-    });
+  res.cookie("user", userName, {
+    maxAge: 15 * 60 * 1000,
+    httpOnly: true,
+    secure: false,
+    sameSite: "strict",
+  });
 
-    return res.status(200).json({
-      success: true,
-      message: "Login Successful"
-    });
-  }
-
-  res.status(401).json({
-    success: false,
-    message: "Invalid Username or Password"
+  return res.status(200).json({
+    success: true,
+    message: "Login Successful",
   });
 });
 
@@ -63,7 +57,7 @@ app.get("/check-cookie", (req, res) => {
 app.get("/protected", (req, res) => {
   const { user } = req.cookies;
 
-  if (user !== "ARKO") {
+  if (!sessionstore[user]?.loggedIn) {
     return res.status(401).send("Not Authorized");
   }
 
@@ -72,10 +66,15 @@ app.get("/protected", (req, res) => {
 
 // Logout Route
 app.post("/logout", (req, res) => {
+  const { user } = req.cookies;
+  if (user) {
+    delete sessionstore[user];
+  }
+
   res.clearCookie("user", {
     httpOnly: true,
     secure: false,
-    sameSite: "strict"
+    sameSite: "strict",
   });
 
   res.send("Logout Successful");
